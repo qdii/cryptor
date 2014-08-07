@@ -2,71 +2,175 @@
 #include <functional>
 #include <string>
 #include <iostream>
+#include <assert.h>
 
 #include "cryptor.h"
 
 static const char * private_key_without_password =
-R"(-----BEGIN RSA PRIVATE KEY-----
-MIIEogIBAAKCAQEAriDoH3gBbJo+SojeL5j+4yQumXgnjhrt5+FChBxOfvTcyczz
-p5qlUNqLzQQcQ/a+XR5qUhaA4l97DgNseFNyoYHIxrB5t+BQw27Q+UuUYYaIwJqZ
-6r2PVCnQF9WPqqWdzBN6+13IlreH2XX4qy47kuLI3lcPlP5qhYaDogpZCl7lN7Oe
-Qj2FAPZ1nkV+PL4RYfWZbBymUz0C105ytT7PWgLAZVvag8kHiNXRYv4Ksc9SJ3AE
-ZriZ1tzpJ6/ZkI3vfJZqCeclELQ8zGxb8CbfSd4mHoHCVY7t1h+BNM4zUxSjN8d7
-bctYJwnfBtztRFN2uTotDJs6njsoxfmh4/SzAQIDAQABAoIBAAGTWKZYPqMN7jxc
-aq5BkyTZAfbviGQXyElN1308iFVLv+evjBDbLF3D7HnpbJwM0oIjMVEW1Qm3VXS2
-AThBgQsHEpsBo8hPJkvuZ8OptGkBf6FGhNgD6RUY38Inc4pWv0vGbVly6sq6VGda
-Uuqxm2Zj2O9yGDj/6FTW97/ymgWm/FfKczg/zGtjdog67W8LvvtmAj5ynSuimOP8
-mOINPjewIbcl7rKvxcMNrOXKsRWwVxTNXdMNMsXd1Figw022KTqdiazQ/DPIXU6M
-f8H+U/gS5QZRIAF8i0r3cvq6ai26dX0OFtsoizqG4qlRNwtQ+wyRsilZKiKnFuMY
-bt1pRBUCgYEA1TlAT/Ui4TBdgGmm0Rlj7JKJENnpDKIFE8bP6Vy8SwBmp5MiRofE
-TMne4BBKLcFcslCJrFvjl7+v4B9a2de7hJYqtevrXjM91vwFhc6z0m27vv6MKStQ
-3uKX8+0RGHQ3j53kAvLxFSuAqYQ+gf9IAuyG0gpMABRvj0/8HY3T7tMCgYEA0Q/O
-0og9UbXh8y3yI94ztczWdIQERyEhQiGNRUnHCqO2QbZQ9Nm190Jx/8yew03xpPVb
-fyWWfKqO8Kjg5np0w37porI0UmfLZ5QMC+GFMq0jOUXidsvkyoWOe4D8LII0L98k
-sjihHBlGNrfFjEgOUQaoreB+8F07m/iofRCROlsCgYAPUUGRfOa4jqTo6K4XL1/C
-SvSVxVG8mpcKyKl+9i6ApNK7DxLTRkWPzqC4L/NkPhPOq4J4Y1GCQT79NsNsCtdp
-uu/uibgq2DuFCi3LYwIAB+oI2nhvLLFukZCg8VLdEtw68PjETXeMMcfYZaun4xLl
-QuCcjijPiKhK/0/5P4sOCQKBgHsi7XXRqxRapdg/ArUfpqN5IAOG0qI2oEk8S+I4
-v1TD8pCn2u0s4mHdsBmzovt0CFVZ8udj80xAhWq4facjD20qbmBWyDyVSBgc+i9x
-SKv9kJamU+oW1A55NeAGrAFnO2fK7elPM43CUTnfairjMhOFcYrghMP8liSbBFqN
-jIyrAoGAVGZQVZgicmSppbBuZYJPOuegPVYhncq3XtBZCtEGGlMtQpKgz+GRhyvT
-Ar/HC7xnS5Gjfyjj6eGHsBAjTsE4t38qD4nxQXzBmAQQ1/7/iq3WNu63OV2q4GRh
-wChOO0pcJPOZfWtvKiy7hbN09e0nt5blX1yqe6LdO7mACWli/Ss=
+    R"(-----BEGIN RSA PRIVATE KEY-----
+MIICXQIBAAKBgQDG+3UbG3/9qkp1bEY2yj0JLE0T7yOggJ4dChZ0/Kfi+6zlMdZn
+1HIWrNAOMRbGUHP7+GyPAjr+GV7QHm5RG2kF7REp1EihSYhBk6B5CqOdP1z1PTTV
+2Aasa9Fsu2thN79Vjqh09vf0Cy6+LCo7j7QbwADuCWjzMkIA4t1x4zhI5wIDAQAB
+AoGBAJv5iHZTPCTvU6Zv1SolpWqHW3QAxICP0WEaAzh4xHFcrs6KHnMNSNEVbZFy
+UVPqxMACn7YKHYwI/xVMhVT2k387kIrDpJov7F9Z4PV5/5gicyU00nIbDlNoqRW8
+Lb1JM/LV+gHGF4ttjRgCXgNw0ranAbq21Qx0bH1EDszelEQhAkEA6wq/XxHJ9tfj
+Nk2JXdAUgt+OJDfDi2qKvmo2fvNJpWHLsw/8FOdOcWlk1onDnzPavZnHBLpOk9Rz
+HynKSVuewwJBANi5lRLjQLTTku/KVp1QJRSyd1fb7Z1vqyka6otOkHNxbnXQNMqT
+zHbx/b6vDOy+Kyd5+wX1h0o++1VpdZUIUw0CQA0VTBG+q79RxRQAvOS78GhYiVD6
+yae5BoAS6XWnlTHff7c37JA9T+CAPVyzzm/OMx7asHlS5YzVBpN1gA0VTIECQG0H
+X/Gylfjif4dW2aAmk6EH73Yp1C5h4U+6lMgkbBNHu3RVnFlVZYVpVGg7lFr9iKRB
+f4GN9dPqP3LGrTqeh3kCQQCEfhnp5ldj+ldETL9NY0tReyN7eTz7l0OXf4Z47TCc
+8PIAiS8s2q7t6klVRwN7yVpyAZjxILcyrAGD/OXpSjCb
 -----END RSA PRIVATE KEY-----)";
 
-static const char * public_key_without_password = 
-R"(ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuIOgfeAFsmj5KiN4vmP7jJC6ZeCeOGu3n4UKEHE5+9NzJzPOnmqVQ2ovNBBxD9r5dHmpSFoDiX3sOA2x4U3KhgcjGsHm34FDDbtD5S5RhhojAmpnqvY9UKdAX1Y+qpZ3ME3r7XciWt4fZdfirLjuS4sjeVw+U/mqFhoOiClkKXuU3s55CPYUA9nWeRX48vhFh9ZlsHKZTPQLXTnK1Ps9aAsBlW9qDyQeI1dFi/gqxz1IncARmuJnW3Oknr9mQje98lmoJ5yUQtDzMbFvwJt9J3iYegcJVju3WH4E0zjNTFKM3x3tty1gnCd8G3O1EU3a5Oi0MmzqeOyjF+aHj9LMB qdii@nomada)";
+static const char * public_key_without_password =
+    R"(-----BEGIN RSA PUBLIC KEY-----
+MIGJAoGBAMb7dRsbf/2qSnVsRjbKPQksTRPvI6CAnh0KFnT8p+L7rOUx1mfUchas
+0A4xFsZQc/v4bI8COv4ZXtAeblEbaQXtESnUSKFJiEGToHkKo50/XPU9NNXYBqxr
+0Wy7a2E3v1WOqHT29/QLLr4sKjuPtBvAAO4JaPMyQgDi3XHjOEjnAgMBAAE=
+-----END RSA PUBLIC KEY-----)";
 
 #define LAUNCH( X ) launch( X, #X )
 
 static
 bool launch( std::function< bool() > fnc, std::string name )
 {
-    bool succeeded = true;
     std::cout << name << ": ";
     try
     {
-        succeeded = fnc();
+        const bool success = fnc();
+        std::cout << ( success ? "OK\n" : "FAILED\n" );
+        return success;
+    }
+    catch( const std::exception & exc )
+    {
+        std::cout << "FAILED (exception: " << exc.what() << ")\n";
+        return false;
     }
     catch( ... )
     {
-        succeeded = false;
+        std::cout << "FAILED(exception)\n";
+        return false;
     }
-    if ( succeeded )
-        std::cout << "OK\n";
-    else
-        std::cout << "FAILED\n";
 
-    return succeeded;
+    assert( 0 );
+    return true;
 }
 
 static
-bool test01()
+bool test_simple_encryption()
 {
     cryptor c( private_key_without_password, public_key_without_password );
+
+    const std::string clear_text = "Hello, world\n";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    if ( encrypted_text.empty() )
+        return false;
+
+    return true;
+}
+
+static
+bool test_short_encryption()
+{
+    cryptor c( private_key_without_password, public_key_without_password );
+
+    const std::string clear_text = "g";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    if ( encrypted_text.empty() )
+        return false;
+
+    return true;
+}
+
+static
+bool test_empty_encryption()
+{
+    cryptor c( private_key_without_password, public_key_without_password );
+
+    const std::string clear_text = "";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    return true;
+}
+
+static
+bool test_long_encryption()
+{
+    cryptor c( private_key_without_password, public_key_without_password );
+
+    const std::string clear_text =
+        R"(Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum)";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    if ( encrypted_text.empty() )
+        return false;
+
+    if ( encrypted_text.size() < clear_text.size() )
+        return false;
+
+    return true;
+}
+
+static
+bool test_long_decryption()
+{
+    cryptor c( private_key_without_password, public_key_without_password );
+
+    const std::string clear_text =
+        R"(Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum)";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    if ( encrypted_text.empty() )
+        return false;
+
+    if ( encrypted_text.size() < clear_text.size() )
+        return false;
+
+    const std::string decrypted_text = c.decrypt( encrypted_text );
+    if ( decrypted_text != clear_text )
+        return false;
+
+    return true;
+}
+
+static
+bool test_simple_decryption()
+{
+    cryptor c( private_key_without_password, public_key_without_password );
+
+    const std::string clear_text = "Hello, world\n";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    if ( encrypted_text.empty() )
+        return false;
+
+    const std::string decrypted_text = c.decrypt( encrypted_text );
+    if ( decrypted_text.empty() )
+        return false;
+
+    if ( clear_text != decrypted_text )
+        return false;
+
+    return true;
+}
+
+static
+bool test_simple_constructor()
+{
+    cryptor c( private_key_without_password, public_key_without_password );
+    return true;
 }
 
 int main()
 {
-    LAUNCH( test01 );
+    LAUNCH( test_simple_constructor );
+    LAUNCH( test_simple_encryption );
+    LAUNCH( test_short_encryption );
+    LAUNCH( test_empty_encryption );
+    LAUNCH( test_long_encryption );
+    LAUNCH( test_simple_decryption );
+    LAUNCH( test_long_decryption );
 }

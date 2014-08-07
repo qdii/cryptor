@@ -21,6 +21,7 @@ AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
 AC_CHECK_HEADER_STDBOOL
 
 # Checks for library functions.
+PKG_CHECK_MODULES([OPENSSL],[openssl])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

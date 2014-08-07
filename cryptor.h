@@ -7,8 +7,54 @@
 /**@brief Exception thrown when an invalid key is used */
 struct invalid_key : public std::exception
 {
-    virtual const char * what() const noexcept override final { return "The RSA key is invalid"; } 
+    virtual const char * what() const noexcept override final
+    {
+        return "The RSA key is invalid";
+    }
 };
+
+/**@brief Exception thrown when an error occur during encryption */
+struct cannot_encrypt : public std::exception
+{
+    cannot_encrypt()
+        : m_reason( "An error occurred while encrypting" )
+    {
+    }
+
+    cannot_encrypt( const char * const reason )
+        : m_reason( reason )
+    {
+    }
+
+    virtual const char * what() const noexcept override final
+    {
+        return m_reason;
+    }
+private:
+    const char * const m_reason;
+};
+
+/**@brief Exception thrown when an error occur during decryption */
+struct cannot_decrypt : public std::exception
+{
+    cannot_decrypt()
+        : m_reason( "An error occurred while decrypting" )
+    {
+    }
+
+    cannot_decrypt( const char * const reason )
+        : m_reason( reason )
+    {
+    }
+
+    virtual const char * what() const noexcept override final
+    {
+        return m_reason;
+    }
+private:
+    const char * const m_reason;
+};
+
 
 /**@author Victor Lavaud
  * @class cryptor
@@ -41,7 +87,7 @@ public:
     std::string decrypt( std::string clear_msg );
 
     ~cryptor() noexcept;
-        
+
 private:
     struct envelope_key;
     envelope_key * m_key;
