@@ -2,6 +2,7 @@
 #define CRYPTOR_H
 
 #include <exception>
+#include <memory> //unique_ptr
 #include <string>
 
 /**@brief Exception thrown when an invalid key is used */
@@ -82,15 +83,16 @@ public:
     std::string encrypt( std::string clear_msg );
 
     /**@brief Decrypts a message
-     * @param[in] crypted_msg The message to decrypt
+     * @param[in] crypted_data The data to decrypt
      * @return A decrypted message built from the crypted message and the private key */
-    std::string decrypt( std::string clear_msg );
+    std::string decrypt( std::string crypted_data );
 
+    /**@brief Destructs a cryptor */
     ~cryptor() noexcept;
 
 private:
-    struct envelope_key;
-    envelope_key * m_key;
+    struct rsa_key_pair;
+    std::unique_ptr<rsa_key_pair> m_keys;
 };
 
 #endif

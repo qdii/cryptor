@@ -112,7 +112,7 @@ private:
     RSA * m_rsa;
 };
 
-struct cryptor::envelope_key
+struct cryptor::rsa_key_pair
 {
     bool set_private_key( std::string private_key, std::string password );
     bool set_public_key( std::string private_key, std::string password );
@@ -141,7 +141,7 @@ private:
     rsa m_public_key, m_private_key;
 };
 
-bool cryptor::envelope_key::set_private_key( std::string private_key,
+bool cryptor::rsa_key_pair::set_private_key( std::string private_key,
         std::string password )
 {
     // the buffer io is just an adapter for openssl to read into the std::string object
@@ -162,7 +162,7 @@ bool cryptor::envelope_key::set_private_key( std::string private_key,
     return true;
 }
 
-bool cryptor::envelope_key::set_public_key( std::string public_key,
+bool cryptor::rsa_key_pair::set_public_key( std::string public_key,
         std::string password )
 {
     // the buffer io is just an adapter for openssl to read into the std::string object
@@ -190,17 +190,17 @@ cryptor::cryptor( std::string private_key, std::string public_key )
 
 cryptor::cryptor( std::string private_key, std::string private_passwd,
                   std::string public_key,  std::string public_passwd )
-    : m_key( new envelope_key )
+    : m_keys( new rsa_key_pair )
 {
     // load error messages
     ERR_load_crypto_strings();
 
-    if ( !m_key->set_private_key( std::move( private_key ),
-                                  std::move( private_passwd ) ) )
+    if ( !m_keys->set_private_key( std::move( private_key ),
+                                   std::move( private_passwd ) ) )
         throw invalid_key();
 
-    if ( !m_key->set_public_key( std::move( public_key ),
-                                 std::move( public_passwd ) ) )
+    if ( !m_keys->set_public_key( std::move( public_key ),
+                                  std::move( public_passwd ) ) )
         throw invalid_key();
 }
 
@@ -299,21 +299,21 @@ private:
 
 std::string cryptor::encrypt( std::string clear_text )
 {
-    assert( m_key );
-    assert( m_key->public_key() != nullptr );
-    std::string encrypted_text;
+    assert( m_keys );
+    assert( m_keys->public_key() != nullptr );
+    std::string encrypted_data;
 
     // split the text into blocks
     const auto blocks_to_encrypt =
-        split_string( clear_text, RSA_size( m_key->public_key() ) - 42 );
+        split_string( clear_text, RSA_size( m_keys->public_key() ) - 42 );
     check_errors();
 
     std::transform( blocks_to_encrypt.cbegin(), blocks_to_encrypt.cend(),
-                    string_appender( encrypted_text ),
-                    block_encrypter( m_key->public_key() ) );
+                    string_appender( encrypted_data ),
+                    block_encrypter( m_keys->public_key() ) );
 
 
-    return encrypted_text;
+    return encrypted_data;
 }
 
 /**@brief A structure which operator() decrypts a short block of data */
@@ -332,14 +332,14 @@ struct block_decrypter
     }
 
     /**@brief Decrypts a block of data
-     * @param[in] crypted_text The text to decrypt */
-    std::string operator()( const std::string & crypted_text )
+     * @param[in] crypted_data The text to decrypt */
+    std::string operator()( const std::string & crypted_data )
     {
         const int nb_bytes_decrypted =
             RSA_private_decrypt(
-                crypted_text.size(),
+                crypted_data.size(),
                 reinterpret_cast< const unsigned char * >(
-                    crypted_text.data() ),
+                    crypted_data.data() ),
                 m_buffer.get(),
                 m_private_key,
                 RSA_PKCS1_OAEP_PADDING
@@ -359,25 +359,24 @@ private:
     std::unique_ptr< unsigned char[] > m_buffer;
 };
 
-std::string cryptor::decrypt( std::string crypted_text )
+std::string cryptor::decrypt( std::string crypted_data )
 {
-    assert( m_key );
-    assert( m_key->private_key() != nullptr );
+    assert( m_keys );
+    assert( m_keys->private_key() != nullptr );
 
-    std::string decrypted_text;
+    std::string decrypted_data;
     const std::list< std::string > chunks =
-        split_string( crypted_text, RSA_size( m_key->private_key() ) );
+        split_string( crypted_data, RSA_size( m_keys->private_key() ) );
 
     // split the crypted text into chunks, decrypt each chunk, and append
-    // them one by one to decrypted_text
+    // them one by one to decrypted_data
     std::transform( chunks.cbegin(), chunks.cend(),
-                    string_appender( decrypted_text ),
-                    block_decrypter( m_key->private_key() ) );
+                    string_appender( decrypted_data ),
+                    block_decrypter( m_keys->private_key() ) );
 
-    return decrypted_text;
+    return decrypted_data;
 }
 
 cryptor::~cryptor() noexcept
 {
-    delete m_key;
 }
