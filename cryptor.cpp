@@ -53,6 +53,25 @@ protected:
     BIO * m_bio;
 };
 
+static
+int feed_password( char * buffer_expecting_passwd,
+                   int max_password_size, int rwflag,
+                   void * password_string_ptr )
+{
+    assert( rwflag == 0 );
+    std::string * const password =
+        reinterpret_cast< std::string * >( password_string_ptr );
+    assert( password != nullptr );
+
+    if ( password->size() > max_password_size )
+        throw password_is_too_long();
+
+    const int nb_chars_copied =
+        password->copy( buffer_expecting_passwd, max_password_size );
+
+    return nb_chars_copied;
+}
+
 struct read_only_buffered_io : buffered_io
 {
     read_only_buffered_io( char * buffer, int size )
@@ -148,10 +167,9 @@ bool cryptor::rsa_key_pair::set_private_key( std::string private_key,
     read_only_buffered_io private_key_bio(
         const_cast<char *>( private_key.c_str() ), private_key.size() );
 
-    // load the rsa object (TODO: read in the private key)
     rsa temporary_rsa;
     RSA * const result = PEM_read_bio_RSAPrivateKey( private_key_bio,
-                         &temporary_rsa, nullptr, 0 );
+                         &temporary_rsa, feed_password, &password );
     check_errors();
     if ( result == nullptr )
         return false;
@@ -169,10 +187,10 @@ bool cryptor::rsa_key_pair::set_public_key( std::string public_key,
     read_only_buffered_io public_key_bio(
         const_cast<char *>( public_key.c_str() ), public_key.size() );
 
-    // load the rsa object (TODO: read in the public key)
+    // load the rsa object
     rsa temporary_rsa;
     RSA * const result = PEM_read_bio_RSAPublicKey( public_key_bio, &temporary_rsa,
-                         nullptr, 0 );
+                         feed_password, &password );
     check_errors();
     if ( result == nullptr )
         return false;

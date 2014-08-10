@@ -57,6 +57,16 @@ private:
 };
 
 
+/**@brief Exceptioh thrown when the password provided to decrypt a RSA key is too long */
+struct password_is_too_long : public std::exception
+{
+    virtual const char * what()
+    {
+        return "The RSA password provided is too long";
+    }
+};
+
+
 /**@author Victor Lavaud
  * @class cryptor
  * @brief Class that can encrypt / decrypt strings using asymetric ciphering (RSA)

@@ -164,6 +164,85 @@ bool test_simple_constructor()
     return true;
 }
 
+static
+bool test_binary_decryption()
+{
+    cryptor c( private_key_without_password, public_key_without_password );
+
+    const std::string clear_text( "abc\0def\n\t\rghi" );
+    const std::string encrypted_text = c.encrypt( clear_text );
+    const std::string decrypted_text = c.decrypt( encrypted_text );
+
+    if ( clear_text != decrypted_text )
+        return false;
+
+    return true;
+
+
+}
+
+static const char * private_key_with_password =
+    R"(-----BEGIN PRIVATE KEY-----
+MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBANlAx1BAaX1oD9lu
+VGbLRVVviQ67L+QPta/NMtaIdtpR0+MrdhRMTm7MwVT3B86GXtehMO129kowD9ZT
+cUEsuasgTnTLQCkV+Tx7YKE4EHtChy3dUvK3uAn442qWVWgTY4vXJjAFvdcYD6nY
+aztswqQetyt5Irckcfv1WPt2mz5pAgMBAAECgYEA1vgSQIZ722ssw6k4Or7ITFGg
+/MKcEL66uMoCk+VUNZLiZtaKcGtQ8LIKW1hUkTbEgfktwMsFyULlaN4IIsVusOGK
+09q/zlu63qkZA5Sep5z8NVuNh0xdJ+MsCUH9AmcHT1ISy2al/siJ8MyZmmyPEAOJ
+3p+qp5+Pi1drALiFiUECQQD/OyAvEh4THADh8d4HQ83pioUoJpF50avM/3BvO+uk
+vHdcPXlYJpEQkR09ziiEphv/E7C3pwxMBKu25odfrOKjAkEA2ehbubnJdyyWebHK
+pzizbbB5nt2KgutndIM5s92G5sAhdGUXeEaXxKIi6AKs7+f+WsiMNt3bcM+tsqRi
+Iyj3gwJBAMfoBH45v4qSHXLbIV8pUWeBUmgvRTRX8CshS2wkT53467g4ggl0M5z5
+PCEDjyLOhBEW2AwQcAY+hkw8ZX2fiOcCQE77I1P7/QPPC3Nsd7GIobBeSJbGYc/2
+FvdqIN4Kqzyz4uxXP9x+acABrHk/jwMdqVmqWvgADeujuqeHYXKxBJUCQQDV4Lm8
+goSY2UEtFHuD+GYArwh4C3rNqgVjgjVEtISU3yF4JUkCzpBsOKeh9gJkVwhsn6n+
+u6Y0tU60TxQ9egO6
+-----END PRIVATE KEY-----)";
+
+static const char * public_key_with_password =
+    R"(-----BEGIN RSA PUBLIC KEY-----
+MIGJAoGBANlAx1BAaX1oD9luVGbLRVVviQ67L+QPta/NMtaIdtpR0+MrdhRMTm7M
+wVT3B86GXtehMO129kowD9ZTcUEsuasgTnTLQCkV+Tx7YKE4EHtChy3dUvK3uAn4
+42qWVWgTY4vXJjAFvdcYD6nYaztswqQetyt5Irckcfv1WPt2mz5pAgMBAAE=
+-----END RSA PUBLIC KEY-----)";
+
+static
+bool test_simple_encryption_with_password()
+{
+    cryptor c( private_key_with_password, "123456",
+               public_key_with_password, "" );
+
+    const std::string clear_text = "Hello, world\n";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    if ( encrypted_text.empty() )
+        return false;
+
+    return true;
+
+}
+
+static
+bool test_simple_decryption_with_password()
+{
+    cryptor c( private_key_with_password, "123456", public_key_with_password, "" );
+
+    const std::string clear_text = "Hello, world\n";
+    const std::string encrypted_text = c.encrypt( clear_text );
+
+    if ( encrypted_text.empty() )
+        return false;
+
+    const std::string decrypted_text = c.decrypt( encrypted_text );
+    if ( decrypted_text.empty() )
+        return false;
+
+    if ( clear_text != decrypted_text )
+        return false;
+
+    return true;
+}
+
 int main()
 {
     LAUNCH( test_simple_constructor );
@@ -173,4 +252,7 @@ int main()
     LAUNCH( test_long_encryption );
     LAUNCH( test_simple_decryption );
     LAUNCH( test_long_decryption );
+    LAUNCH( test_binary_decryption );
+    LAUNCH( test_simple_encryption_with_password );
+    LAUNCH( test_simple_decryption_with_password );
 }
