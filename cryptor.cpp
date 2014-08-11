@@ -53,6 +53,14 @@ protected:
     BIO * m_bio;
 };
 
+/**@brief Hands a password to openssl
+ * @param[in] buffer expecting_passwd A buffer which openssl
+ *                   will read the password from
+ * @param[in] max_password_size openssl tells us that a password
+ *                              has to be shorter than this
+ * @param[in] rwflag 0 when openssl reads a password from the buffer,
+ *                   1 when it writes to it
+ * @param[in] password_string_ptr user data I use to store the password */
 static
 int feed_password( char * buffer_expecting_passwd,
                    int max_password_size, int rwflag,
@@ -63,7 +71,7 @@ int feed_password( char * buffer_expecting_passwd,
         reinterpret_cast< std::string * >( password_string_ptr );
     assert( password != nullptr );
 
-    if ( password->size() > max_password_size )
+    if ( password->size() > static_cast< size_t >( max_password_size ) )
         throw password_is_too_long();
 
     const int nb_chars_copied =
@@ -259,7 +267,7 @@ struct block_crypter
     /**@brief Constructs a block decrypter
      * @param[in] key The key used to decrypt or encrypt the data
      * @param[in] perform_encryption True to perform encryption, false to perform decryption */
-    block_crypter( std::shared_ptr<rsa> key, bool perform_encryption )
+    block_crypter( std::shared_ptr<rsa> key, const bool perform_encryption )
         : m_key( key )
         , m_buffer_size( RSA_size( *m_key ) )
         , m_buffer( new unsigned char[ m_buffer_size ] )
@@ -270,7 +278,7 @@ struct block_crypter
         memset( m_buffer.get(), 0, m_buffer_size );
     }
 
-    block_crypter( rsa_key_pair & key_pair, bool perform_encryption )
+    block_crypter( rsa_key_pair & key_pair, const bool perform_encryption )
         : block_crypter( perform_encryption ? key_pair.public_key() :
                          key_pair.private_key(),
                          perform_encryption )
@@ -295,7 +303,7 @@ struct block_crypter
         if ( nb_bytes_treated == -1 )
             throw cannot_encrypt_or_decrypt( ERR_reason_error_string( ERR_get_error() ) );
 
-        assert( nb_bytes_treated <= m_buffer_size );
+        assert( static_cast<unsigned>( nb_bytes_treated ) <= m_buffer_size );
         return std::string( reinterpret_cast<char *>( m_buffer.get() ),
                             nb_bytes_treated );
     }
@@ -316,7 +324,8 @@ std::string cryptor::encrypt( std::string clear_text )
 
     // split the text into blocks
     const auto blocks_to_encrypt =
-        split_string( clear_text, RSA_size( *m_keys->public_key() ) - 42 );
+        split_string( std::move( clear_text ),
+                      RSA_size( *m_keys->public_key() ) - 42 );
     check_errors();
 
     std::transform( blocks_to_encrypt.cbegin(), blocks_to_encrypt.cend(),
@@ -334,7 +343,7 @@ std::string cryptor::decrypt( std::string crypted_data )
 
     std::string decrypted_data;
     const std::list< std::string > chunks =
-        split_string( crypted_data, RSA_size( *m_keys->private_key() ) );
+        split_string( std::move( crypted_data ), RSA_size( *m_keys->private_key() ) );
 
     // split the crypted text into chunks, decrypt each chunk, and append
     // them one by one to decrypted_data

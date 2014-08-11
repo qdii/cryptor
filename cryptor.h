@@ -42,7 +42,7 @@ private:
 /**@brief Exceptioh thrown when the password provided to decrypt a RSA key is too long */
 struct password_is_too_long : public std::exception
 {
-    virtual const char * what()
+    virtual const char * what() const noexcept override final
     {
         return "The RSA password provided is too long";
     }
