@@ -253,47 +253,59 @@ private:
     std::string & m_original_string;
 };
 
-/**@brief A structure which operator() encrypts a short block of data */
-struct block_encrypter
+/**@brief A structure which operator() decrypts / encrypts a short block of data */
+struct block_crypter
 {
-    /**@brief Constructs a block encrypter
-     * @param[in] public_key The key used to encrypt the data */
-    explicit
-    block_encrypter( std::shared_ptr<rsa> public_key )
-        : m_public_key( public_key )
-        , m_buffer_size( RSA_size( *public_key ) )
+    /**@brief Constructs a block decrypter
+     * @param[in] key The key used to decrypt or encrypt the data
+     * @param[in] perform_encryption True to perform encryption, false to perform decryption */
+    block_crypter( std::shared_ptr<rsa> key, bool perform_encryption )
+        : m_key( key )
+        , m_buffer_size( RSA_size( *m_key ) )
         , m_buffer( new unsigned char[ m_buffer_size ] )
+        , m_cipher_function( perform_encryption ? RSA_public_encrypt :
+                             RSA_private_decrypt )
     {
         check_errors();
         memset( m_buffer.get(), 0, m_buffer_size );
     }
 
-    /**@brief Encrypts a block of data
-     * @param[in] clear_text The text to encrypt */
-    std::string operator()( const std::string & clear_text )
+    block_crypter( rsa_key_pair & key_pair, bool perform_encryption )
+        : block_crypter( perform_encryption ? key_pair.public_key() :
+                         key_pair.private_key(),
+                         perform_encryption )
     {
-        const int nb_bytes_encrypted =
-            RSA_public_encrypt(
-                clear_text.size(),
-                reinterpret_cast< const unsigned char * >(
-                    clear_text.data() ),
+    }
+
+    /**@brief Decrypts or encrypts a block of data
+     * @param[in] input The text to treat */
+    std::string operator()( const std::string & input )
+    {
+        // perform the actual encryption / decryption
+        const int nb_bytes_treated =
+            m_cipher_function(
+                input.size(),
+                reinterpret_cast< const unsigned char * >( input.data() ),
                 m_buffer.get(),
-                *m_public_key,
-                RSA_PKCS1_OAEP_PADDING
-            );
+                *m_key,
+                RSA_PKCS1_OAEP_PADDING );
 
         check_errors();
-        if ( nb_bytes_encrypted == -1 )
-            throw cannot_encrypt( ERR_reason_error_string( ERR_get_error() ) );
 
+        if ( nb_bytes_treated == -1 )
+            throw cannot_encrypt_or_decrypt( ERR_reason_error_string( ERR_get_error() ) );
+
+        assert( nb_bytes_treated <= m_buffer_size );
         return std::string( reinterpret_cast<char *>( m_buffer.get() ),
-                            nb_bytes_encrypted );
+                            nb_bytes_treated );
     }
 
 private:
-    std::shared_ptr<rsa> m_public_key;
+    std::shared_ptr<rsa> m_key;
     const size_t m_buffer_size;
     std::unique_ptr< unsigned char[] > m_buffer;
+    std::function< int( int, const unsigned char *, unsigned char *, RSA *, int ) >
+    m_cipher_function;
 };
 
 std::string cryptor::encrypt( std::string clear_text )
@@ -309,54 +321,11 @@ std::string cryptor::encrypt( std::string clear_text )
 
     std::transform( blocks_to_encrypt.cbegin(), blocks_to_encrypt.cend(),
                     string_appender( encrypted_data ),
-                    block_encrypter( m_keys->public_key() ) );
+                    block_crypter( m_keys->public_key() , true ) );
 
 
     return encrypted_data;
 }
-
-/**@brief A structure which operator() decrypts a short block of data */
-struct block_decrypter
-{
-    /**@brief Constructs a block decrypter
-     * @param[in] private_key The key used to decrypt the data */
-    explicit
-    block_decrypter( std::shared_ptr<rsa> private_key )
-        : m_private_key( private_key )
-        , m_buffer_size( RSA_size( *private_key ) )
-        , m_buffer( new unsigned char[ m_buffer_size ] )
-    {
-        check_errors();
-        memset( m_buffer.get(), 0, m_buffer_size );
-    }
-
-    /**@brief Decrypts a block of data
-     * @param[in] crypted_data The text to decrypt */
-    std::string operator()( const std::string & crypted_data )
-    {
-        const int nb_bytes_decrypted =
-            RSA_private_decrypt(
-                crypted_data.size(),
-                reinterpret_cast< const unsigned char * >(
-                    crypted_data.data() ),
-                m_buffer.get(),
-                *m_private_key,
-                RSA_PKCS1_OAEP_PADDING
-            );
-        check_errors();
-        if ( nb_bytes_decrypted == -1 )
-            throw cannot_decrypt( ERR_reason_error_string( ERR_get_error() ) );
-
-        assert( nb_bytes_decrypted <= m_buffer_size );
-        return std::string( reinterpret_cast<char *>( m_buffer.get() ),
-                            nb_bytes_decrypted );
-    }
-
-private:
-    std::shared_ptr<rsa> m_private_key;
-    const size_t m_buffer_size;
-    std::unique_ptr< unsigned char[] > m_buffer;
-};
 
 std::string cryptor::decrypt( std::string crypted_data )
 {
@@ -371,7 +340,7 @@ std::string cryptor::decrypt( std::string crypted_data )
     // them one by one to decrypted_data
     std::transform( chunks.cbegin(), chunks.cend(),
                     string_appender( decrypted_data ),
-                    block_decrypter( m_keys->private_key() ) );
+                    block_crypter( m_keys->private_key(), false ) );
 
     return decrypted_data;
 }

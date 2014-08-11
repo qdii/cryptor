@@ -18,35 +18,14 @@ struct invalid_key : public std::exception
 };
 
 /**@brief Exception thrown when an error occur during encryption */
-struct cannot_encrypt : public std::exception
+struct cannot_encrypt_or_decrypt: public std::exception
 {
-    cannot_encrypt()
-        : m_reason( "An error occurred while encrypting" )
+    cannot_encrypt_or_decrypt()
+        : m_reason( "An error occurred while encrypting or decrypting" )
     {
     }
 
-    cannot_encrypt( const char * const reason )
-        : m_reason( reason )
-    {
-    }
-
-    virtual const char * what() const noexcept override final
-    {
-        return m_reason;
-    }
-private:
-    const char * const m_reason;
-};
-
-/**@brief Exception thrown when an error occur during decryption */
-struct cannot_decrypt : public std::exception
-{
-    cannot_decrypt()
-        : m_reason( "An error occurred while decrypting" )
-    {
-    }
-
-    cannot_decrypt( const char * const reason )
+    cannot_encrypt_or_decrypt( const char * const reason )
         : m_reason( reason )
     {
     }
