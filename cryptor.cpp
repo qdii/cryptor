@@ -204,11 +204,13 @@ cryptor::cryptor( std::string private_key, std::string private_passwd,
     // load error messages
     ERR_load_crypto_strings();
 
-    m_keys->set_private_key( std::move( private_key ),
-                             std::move( private_passwd ) );
+    if ( !private_key.empty() )
+        m_keys->set_private_key( std::move( private_key ),
+                                 std::move( private_passwd ) );
 
-    m_keys->set_public_key( std::move( public_key ),
-                            std::move( public_passwd ) );
+    if ( !public_key.empty() )
+        m_keys->set_public_key( std::move( public_key ),
+                                std::move( public_passwd ) );
 }
 
 /**@brief Splits a string into fixed-size chunks */
@@ -318,43 +320,74 @@ private:
 
 std::string cryptor::encrypt( std::string clear_text )
 {
-    assert( m_keys );
-    assert( m_keys->public_key() != nullptr );
-    std::string encrypted_data;
-
-    // split the text into blocks
-    const auto blocks_to_encrypt =
-        split_string( std::move( clear_text ),
-                      RSA_size( *m_keys->public_key() ) - 42 );
-    check_errors();
-
-    std::transform( blocks_to_encrypt.cbegin(), blocks_to_encrypt.cend(),
-                    string_appender( encrypted_data ),
-                    block_crypter( m_keys->public_key() , true ) );
-
-
-    return encrypted_data;
+    return encrypt_or_decrypt( std::move( clear_text ), true );
 }
 
 std::string cryptor::decrypt( std::string crypted_data )
 {
-    assert( m_keys );
-    assert( m_keys->private_key() != nullptr );
+    return encrypt_or_decrypt( std::move( crypted_data ), false );
+}
 
-    std::string decrypted_data;
+std::string cryptor::encrypt_or_decrypt( std::string input, const bool encrypt )
+{
+    std::shared_ptr<rsa> key = encrypt ? m_keys->public_key()
+                               : m_keys->private_key();
+
+    assert( key.get() != nullptr );
+
+    const size_t chunk_size = encrypt ? ( RSA_size( *key ) - 42 )
+                              : ( RSA_size( *key ) );
+
+    // split the input string into fix-sized chunks
+    std::string output;
     const std::list< std::string > chunks =
-        split_string( std::move( crypted_data ), RSA_size( *m_keys->private_key() ) );
+        split_string( std::move( input ), chunk_size );
 
-    // split the crypted text into chunks, decrypt each chunk, and append
-    // them one by one to decrypted_data
+    // process each chunk and append it to the output data
     std::transform( chunks.cbegin(), chunks.cend(),
-                    string_appender( decrypted_data ),
-                    block_crypter( m_keys->private_key(), false ) );
+                    string_appender( output ),
+                    block_crypter( key, encrypt ) );
 
-    return decrypted_data;
+    return output;
+
 }
 
 cryptor::~cryptor() noexcept
 {
 }
 
+cryptbuf::cryptbuf( std::string encryption_key, std::ostream & ostr )
+    : cryptbuf( encryption_key, ostr, "" )
+{
+}
+
+cryptbuf::cryptbuf( std::string encryption_key, std::ostream & ostr,
+                    std::string password )
+    : m_cryptor( "" /* no private key */, "" /* no password for that key */,
+                 std::move( encryption_key ), std::move( password ) )
+    , m_ostr( ostr )
+{
+}
+
+int cryptbuf::sync()
+{
+    // encrypt current buffer
+    const std::string & current_buffer = str();
+    std::string encrypted_buffer = m_cryptor.encrypt( current_buffer );
+
+    // flushes encrypted buffer into the output stream
+    m_ostr.write( encrypted_buffer.c_str(), encrypted_buffer.size() );
+
+    return 0;
+}
+
+cryptbuf::~cryptbuf() noexcept
+{
+    try
+    {
+        sync();
+    }
+    catch( ... )
+    {
+    }
+}

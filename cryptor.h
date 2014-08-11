@@ -4,6 +4,7 @@
 #include <exception>
 #include <memory> //unique_ptr
 #include <string>
+#include <sstream> //stringbuf
 
 
 struct rsa_key_pair;
@@ -83,7 +84,37 @@ public:
     ~cryptor() noexcept;
 
 private:
+    std::string encrypt_or_decrypt( std::string input, bool encrypt );
+
+private:
     std::unique_ptr<rsa_key_pair> m_keys;
 };
 
+/**@brief A string buffer that perform encryption */
+class cryptbuf : public std::stringbuf
+{
+public:
+    /**@brief Constructs a cryptbuf
+     * @param[in] encryption_key The RSA key to use to encrypt the streams
+     * @param[in] ostr The stream into which the encrypted data is pushed */
+    explicit
+    cryptbuf( std::string encryption_key, std::ostream & ostr );
+
+    /**@brief Constructs a cryptbuf
+     * @param[in] encryption_key The RSA key to use to encrypt the streams
+     * @param[in] ostr The stream into which the encrypted data is pushed
+     * @param[in] password The password to use to decrypt @encryption_key */
+    cryptbuf( std::string encryption_key, std::ostream & ostr,
+              std::string password );
+
+    /**@brief Flushes the current buffer into the output stream */
+    int sync() override;
+
+    /**@brief Destructs a cryptbuf */
+    virtual ~cryptbuf() noexcept;
+
+private:
+    cryptor m_cryptor;
+    std::ostream & m_ostr;
+};
 #endif

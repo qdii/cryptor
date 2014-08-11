@@ -243,6 +243,77 @@ bool test_simple_decryption_with_password()
     return true;
 }
 
+struct encrypting_ostream : public std::ostream
+{
+    explicit
+    encrypting_ostream( std::string encrypting_key, std::ostream & ostr,
+                        std::string password = "" )
+        : std::ostream( &m_encrypting_buffer )
+        , m_encrypting_buffer( std::move( encrypting_key ), ostr,
+                               std::move( password ) )
+    {
+    }
+
+    virtual ~encrypting_ostream() noexcept
+    {
+    }
+
+private:
+    cryptbuf m_encrypting_buffer;
+};
+
+static
+bool test_encrypt_stream()
+{
+    std::stringstream stream_which_receives_encrypted_contents;
+
+    // create a stream that automatically encrypts the contents and flushes into another stream
+    encrypting_ostream ostr( public_key_without_password,
+                             stream_which_receives_encrypted_contents );
+
+    // pushes some text into it
+    ostr << "Hello, " << "world" << std::endl;
+
+    // checks that the initial stream has received correctly encoded data
+    cryptor c( private_key_without_password, "", public_key_without_password, "" );
+    const std::string encrypted_contents =
+        stream_which_receives_encrypted_contents.str();
+    const std::string decrypted_contents = c.decrypt( encrypted_contents );
+
+    if ( decrypted_contents != "Hello, world\n" )
+        return false;
+
+    return true;
+}
+
+static
+bool test_encrypt_binary_stream()
+{
+    std::stringstream stream_which_receives_encrypted_contents;
+
+    // create a stream that automatically encrypts the contents and flushes into another stream
+    encrypting_ostream ostr( public_key_without_password,
+                             stream_which_receives_encrypted_contents );
+
+    // pushes some text into it
+    ostr.write( "Hell\0o, ", 8 );
+    ostr.write( "world", 5 );
+    ostr.flush();
+
+    // checks that the initial stream has received correctly encoded data
+    cryptor c( private_key_without_password, "", public_key_without_password, "" );
+    const std::string encrypted_contents =
+        stream_which_receives_encrypted_contents.str();
+    const std::string decrypted_contents = c.decrypt( encrypted_contents );
+    const std::string original_string( "Hell\0o, world", 13 );
+
+    if ( decrypted_contents != original_string )
+        return false;
+
+    return true;
+
+}
+
 int main()
 {
     LAUNCH( test_simple_constructor );
@@ -255,4 +326,6 @@ int main()
     LAUNCH( test_binary_decryption );
     LAUNCH( test_simple_encryption_with_password );
     LAUNCH( test_simple_decryption_with_password );
+    LAUNCH( test_encrypt_stream );
+    LAUNCH( test_encrypt_binary_stream );
 }
