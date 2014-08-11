@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([cryptor], [1.1.0], [victor.lavaud@gmail.com])
+AC_INIT([cryptor], [1.2.0], [victor.lavaud@gmail.com])
 AC_CONFIG_SRCDIR([cryptor.cpp])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([foreign])
