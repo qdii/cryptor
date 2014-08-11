@@ -5,6 +5,9 @@
 #include <memory> //unique_ptr
 #include <string>
 
+
+struct rsa_key_pair;
+
 /**@brief Exception thrown when an invalid key is used */
 struct invalid_key : public std::exception
 {
@@ -101,7 +104,6 @@ public:
     ~cryptor() noexcept;
 
 private:
-    struct rsa_key_pair;
     std::unique_ptr<rsa_key_pair> m_keys;
 };
 

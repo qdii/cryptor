@@ -94,6 +94,28 @@ struct rsa
     {
     };
 
+    rsa( std::string data, bool is_private_key, std::string password )
+        : rsa()
+    {
+        // the buffer io is just an adapter for openssl to read into the std::string object
+        read_only_buffered_io buffer(
+            const_cast<char *>( data.c_str() ), data.size() );
+
+        rsa temporary_rsa;
+        RSA * const result =
+            is_private_key ? PEM_read_bio_RSAPrivateKey( buffer, &temporary_rsa,
+                    feed_password, &password )
+            : PEM_read_bio_RSAPublicKey ( buffer, &temporary_rsa, feed_password,
+                                          &password );
+        check_errors();
+        if ( result == nullptr )
+            throw invalid_key();
+
+        // if everything went fine, move it to the data member
+        m_rsa = temporary_rsa.m_rsa;
+        temporary_rsa.m_rsa = nullptr;
+    }
+
     rsa( rsa && dead )
         : m_rsa( dead.m_rsa )
     {
@@ -131,74 +153,35 @@ private:
     RSA * m_rsa;
 };
 
-struct cryptor::rsa_key_pair
+struct rsa_key_pair
 {
-    bool set_private_key( std::string private_key, std::string password );
-    bool set_public_key( std::string private_key, std::string password );
+    void set_private_key( std::string private_key, std::string password );
+    void set_public_key( std::string private_key, std::string password );
 
-    rsa & public_key()
+    std::shared_ptr<rsa> public_key() const
     {
         return m_public_key;
     }
 
-    const rsa & public_key() const
-    {
-        return m_public_key;
-    }
-
-    rsa & private_key()
-    {
-        return m_private_key;
-    }
-
-    const rsa & private_key() const
+    std::shared_ptr<rsa> private_key() const
     {
         return m_private_key;
     }
 
 private:
-    rsa m_public_key, m_private_key;
+    std::shared_ptr<rsa> m_public_key, m_private_key;
 };
 
-bool cryptor::rsa_key_pair::set_private_key( std::string private_key,
-        std::string password )
+void rsa_key_pair::set_private_key( std::string private_key,
+                                    std::string password )
 {
-    // the buffer io is just an adapter for openssl to read into the std::string object
-    read_only_buffered_io private_key_bio(
-        const_cast<char *>( private_key.c_str() ), private_key.size() );
-
-    rsa temporary_rsa;
-    RSA * const result = PEM_read_bio_RSAPrivateKey( private_key_bio,
-                         &temporary_rsa, feed_password, &password );
-    check_errors();
-    if ( result == nullptr )
-        return false;
-
-    // if everything went fine, move it to the data member
-    m_private_key = std::move( temporary_rsa );
-
-    return true;
+    m_private_key.reset( new rsa( private_key, true, password ) );
 }
 
-bool cryptor::rsa_key_pair::set_public_key( std::string public_key,
-        std::string password )
+void rsa_key_pair::set_public_key( std::string public_key,
+                                   std::string password )
 {
-    // the buffer io is just an adapter for openssl to read into the std::string object
-    read_only_buffered_io public_key_bio(
-        const_cast<char *>( public_key.c_str() ), public_key.size() );
-
-    // load the rsa object
-    rsa temporary_rsa;
-    RSA * const result = PEM_read_bio_RSAPublicKey( public_key_bio, &temporary_rsa,
-                         feed_password, &password );
-    check_errors();
-    if ( result == nullptr )
-        return false;
-
-    // if everything went fine, move it to the data member
-    m_public_key = std::move( temporary_rsa );
-
-    return true;
+    m_public_key.reset( new rsa( public_key, false, password ) );
 }
 
 cryptor::cryptor( std::string private_key, std::string public_key )
@@ -213,13 +196,11 @@ cryptor::cryptor( std::string private_key, std::string private_passwd,
     // load error messages
     ERR_load_crypto_strings();
 
-    if ( !m_keys->set_private_key( std::move( private_key ),
-                                   std::move( private_passwd ) ) )
-        throw invalid_key();
+    m_keys->set_private_key( std::move( private_key ),
+                             std::move( private_passwd ) );
 
-    if ( !m_keys->set_public_key( std::move( public_key ),
-                                  std::move( public_passwd ) ) )
-        throw invalid_key();
+    m_keys->set_public_key( std::move( public_key ),
+                            std::move( public_passwd ) );
 }
 
 /**@brief Splits a string into fixed-size chunks */
@@ -278,9 +259,9 @@ struct block_encrypter
     /**@brief Constructs a block encrypter
      * @param[in] public_key The key used to encrypt the data */
     explicit
-    block_encrypter( rsa & public_key )
+    block_encrypter( std::shared_ptr<rsa> public_key )
         : m_public_key( public_key )
-        , m_buffer_size( RSA_size( public_key ) )
+        , m_buffer_size( RSA_size( *public_key ) )
         , m_buffer( new unsigned char[ m_buffer_size ] )
     {
         check_errors();
@@ -297,7 +278,7 @@ struct block_encrypter
                 reinterpret_cast< const unsigned char * >(
                     clear_text.data() ),
                 m_buffer.get(),
-                m_public_key,
+                *m_public_key,
                 RSA_PKCS1_OAEP_PADDING
             );
 
@@ -310,7 +291,7 @@ struct block_encrypter
     }
 
 private:
-    rsa & m_public_key;
+    std::shared_ptr<rsa> m_public_key;
     const size_t m_buffer_size;
     std::unique_ptr< unsigned char[] > m_buffer;
 };
@@ -323,7 +304,7 @@ std::string cryptor::encrypt( std::string clear_text )
 
     // split the text into blocks
     const auto blocks_to_encrypt =
-        split_string( clear_text, RSA_size( m_keys->public_key() ) - 42 );
+        split_string( clear_text, RSA_size( *m_keys->public_key() ) - 42 );
     check_errors();
 
     std::transform( blocks_to_encrypt.cbegin(), blocks_to_encrypt.cend(),
@@ -340,9 +321,9 @@ struct block_decrypter
     /**@brief Constructs a block decrypter
      * @param[in] private_key The key used to decrypt the data */
     explicit
-    block_decrypter( rsa & private_key )
+    block_decrypter( std::shared_ptr<rsa> private_key )
         : m_private_key( private_key )
-        , m_buffer_size( RSA_size( private_key ) )
+        , m_buffer_size( RSA_size( *private_key ) )
         , m_buffer( new unsigned char[ m_buffer_size ] )
     {
         check_errors();
@@ -359,7 +340,7 @@ struct block_decrypter
                 reinterpret_cast< const unsigned char * >(
                     crypted_data.data() ),
                 m_buffer.get(),
-                m_private_key,
+                *m_private_key,
                 RSA_PKCS1_OAEP_PADDING
             );
         check_errors();
@@ -372,7 +353,7 @@ struct block_decrypter
     }
 
 private:
-    rsa & m_private_key;
+    std::shared_ptr<rsa> m_private_key;
     const size_t m_buffer_size;
     std::unique_ptr< unsigned char[] > m_buffer;
 };
@@ -384,7 +365,7 @@ std::string cryptor::decrypt( std::string crypted_data )
 
     std::string decrypted_data;
     const std::list< std::string > chunks =
-        split_string( crypted_data, RSA_size( m_keys->private_key() ) );
+        split_string( crypted_data, RSA_size( *m_keys->private_key() ) );
 
     // split the crypted text into chunks, decrypt each chunk, and append
     // them one by one to decrypted_data
@@ -398,3 +379,4 @@ std::string cryptor::decrypt( std::string crypted_data )
 cryptor::~cryptor() noexcept
 {
 }
+
